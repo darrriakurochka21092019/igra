@@ -10,6 +10,7 @@ type TextKey = { correct: string; alternatives: string[]; match?: 'strict-yo' };
 type Field = TextKey & { label: string };
 interface BaseQuestion {
   id: string;
+  topic: string;
   subtopic: string;
   prompt: string;
   materials: string[];
@@ -27,13 +28,13 @@ type FieldsQuestion = BaseQuestion & { interaction: 'fields'; answer: { fields: 
 export type WrittenQuestion = SelectionQuestion | TextQuestion | FieldsQuestion;
 export type VoiceQuestion = BaseQuestion & { answer: { model: string; alternatives: string[] } };
 
-export const terminals: Record<string, { name: string; questions: string[] }> = {
-  'platform-terminal': { name: 'Панель ремонтной клетки', questions: ['C01-01', 'C02-01', 'C03-03'] },
-  'service-terminal': { name: 'Терминал перехода', questions: ['C03-05'] },
-  'lab-terminal': { name: 'Анализатор записей', questions: ['C04-01', 'C04-03'] },
-  'archive-terminal': { name: 'Архивный каталог', questions: ['C04-06'] },
-  'route-terminal': { name: 'Панель маршрута', questions: ['C05-03', 'C05-04', 'C05-06'] },
-  'shutter-terminal': { name: 'Терминал заслонки', questions: ['C06-03', 'C06-05'] },
+export const terminals: Record<string, { name: string; chapter: number; questions: string[] }> = {
+  'platform-terminal': { name: 'Панель ремонтной клетки', chapter: 0, questions: ['C01-01', 'C02-01', 'C03-03'] },
+  'service-terminal': { name: 'Терминал перехода', chapter: 0, questions: ['C03-05'] },
+  'lab-terminal': { name: 'Анализатор записей', chapter: 1, questions: ['C04-01', 'C04-03'] },
+  'archive-terminal': { name: 'Архивный каталог', chapter: 1, questions: ['C04-06'] },
+  'route-terminal': { name: 'Панель маршрута', chapter: 2, questions: ['C05-03', 'C05-04', 'C05-06'] },
+  'shutter-terminal': { name: 'Терминал заслонки', chapter: 2, questions: ['C06-03', 'C06-05'] },
 };
 
 const requested = new Set(Object.values(terminals).flatMap(terminal => terminal.questions));
@@ -45,6 +46,12 @@ export const questions = new Map(
 const finalVoice = oral.questions.find(question => question.id === 'V06-01');
 if (questions.size !== requested.size || !finalVoice) throw new Error('В кампании есть ссылка на отсутствующее задание.');
 export const voiceQuestion: VoiceQuestion = finalVoice;
+
+export function reportQuestions(lessonChapter?: number) {
+  return Object.values(terminals)
+    .filter(terminal => lessonChapter === undefined || terminal.chapter === lessonChapter)
+    .flatMap(terminal => terminal.questions.map(id => ({ question: questions.get(id)!, chapter: terminal.chapter })));
+}
 
 function normalize(text: string, strictYo = false): string {
   const tidy = text.normalize('NFC').trim().toLocaleLowerCase('ru')

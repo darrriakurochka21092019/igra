@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { intro, line, logs, sectors, type StationObject } from './campaign';
 import { element, StationDialogs, type Score } from './dialogs';
-import { questions, terminals, voiceQuestion } from './learning';
-import { blankProgress, loadProgress, loadSettings, MAX_HEALTH, saveProgress, saveSettings, type PlayMode, type Progress } from './progress';
+import { questions, reportQuestions, terminals, voiceQuestion } from './learning';
+import { blankLesson, blankProgress, loadProgress, loadSettings, MAX_HEALTH, saveProgress, saveSettings, type PlayMode, type Progress } from './progress';
 import { StationSound } from './sound';
 import { engineConfig, StationWorld, type WorldStatus } from './world';
 import './style.css';
@@ -19,6 +19,7 @@ const notice = element('notice');
 const interactButton = element<HTMLButtonElement>('interact');
 const target = element('target');
 const hudEcho = element('echo-hud');
+const lessonButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-chapter]')];
 const settings = loadSettings();
 const sound = new StationSound();
 let saved = loadProgress();
@@ -41,6 +42,7 @@ const world = new StationWorld({
   ready: () => { worldReady = true; if (active && progress) loadChapter(); },
   interact,
   event: worldEvent,
+  echoChanged: () => persist(!!progress?.echoTrace),
   notice: toast,
   sound: cue => sound.play(cue),
   status: renderWorldStatus,
@@ -62,8 +64,11 @@ function toast(message: string): void {
 function persist(checkpoint = false): void {
   if (!progress) return;
   if (checkpoint && worldReady) progress.checkpoint = world.setCheckpoint();
-  if (saveProgress(progress)) saved = progress;
-  else toast('Браузер не смог сохранить прогресс. Пока эта вкладка открыта, можно продолжать.');
+  if (!saveProgress(progress)) {
+    toast('Браузер не смог сохранить прогресс. Пока эта вкладка открыта, можно продолжать.');
+  } else if (!progress.lesson) {
+    saved = progress;
+  }
 }
 
 function refreshHome(): void {
@@ -73,6 +78,13 @@ function refreshHome(): void {
   start.firstChild!.textContent = saved ? 'Новая игра ' : 'Начать игру ';
   continueButton.firstChild!.textContent = saved?.completed ? 'Посмотреть итоги ' : 'Продолжить ';
   savedLabel.textContent = saved ? (saved.completed ? 'Кампания пройдена' : `Сохранение · ${sectors[saved.chapter].name}`) : '';
+  for (const button of lessonButtons) {
+    const chapter = Number(button.dataset.chapter);
+    const state = loadProgress(chapter);
+    const icon = button.querySelector('.chapter-link')!;
+    icon.textContent = state ? (state.completed ? '✓' : '↻') : '→';
+    button.title = state ? (state.completed ? 'Глава пройдена. Можно открыть итоги.' : 'Есть сохранение этой главы.') : '';
+  }
 }
 
 function begin(state: Progress): void {
@@ -91,11 +103,13 @@ function loadChapter(): void {
   notice.hidden = true;
   const chapter = progress.chapter;
   const sector = sectors[chapter];
-  element('game-chapter').textContent = `ГЛАВА 0${chapter + 1} / 03`;
+  element('game-chapter').textContent = progress.lesson ? `ОТДЕЛЬНАЯ ГЛАВА · 0${chapter + 1}` : `ГЛАВА 0${chapter + 1} / 03`;
+  element('progress-label').textContent = progress.lesson ? 'ОТДЕЛЬНАЯ ГЛАВА' : 'ХОД ПРОХОЖДЕНИЯ';
   element('game-title').textContent = sector.name;
   [...element('chapter-progress').children].forEach((child, i) => {
     child.classList.toggle('active', i === chapter);
     child.classList.toggle('done', i < chapter || !!progress?.completed);
+    (child as HTMLElement).hidden = !!progress?.lesson && i !== chapter;
     if (i === chapter) child.setAttribute('aria-current', 'step');
     else child.removeAttribute('aria-current');
   });
@@ -108,7 +122,8 @@ function loadChapter(): void {
   } else if (!progress.flags[`intro${chapter}`]) {
     progress.flags[`intro${chapter}`] = true;
     persist();
-    dialogs.story(sector.subtitle, intro[chapter], undefined, `ГЛАВА 0${chapter + 1}`);
+    const opening = progress.lesson ? [line('Предыстория', sector.lessonIntro), ...intro[chapter]] : intro[chapter];
+    dialogs.story(sector.subtitle, opening, undefined, `ГЛАВА 0${chapter + 1}`);
   } else {
     world.setPaused(false);
     canvas.focus({ preventScroll: true });
@@ -127,6 +142,11 @@ function menu(): void {
 
 function nextChapter(): void {
   if (!progress || progress.chapter >= sectors.length - 1) return;
+  if (progress.lesson) {
+    completeRun();
+    showResults();
+    return;
+  }
   progress.chapter++;
   progress.checkpoint = null;
   persist();
@@ -135,7 +155,7 @@ function nextChapter(): void {
 
 function getObjective(state: Progress): Objective {
   const f = state.flags;
-  if (state.completed) return { title: 'Эвакуация завершена', detail: 'Учебный отчёт доступен в журнале.', ids: [] };
+  if (state.completed) return { title: state.chapter === 2 ? 'Эвакуация завершена' : 'Глава пройдена', detail: 'Учебный отчёт доступен в журнале.', ids: [] };
   if (state.chapter === 0) {
     if (!f.kit) return { title: 'Найди ремонтный комплект', detail: 'Следуй по указателю в билетную кассу. Карта открывается клавишей M.', ids: ['kit'] };
     if (!f.yellow) return { title: 'Включи жёлтый рубильник', detail: 'Через платформу пройди к кабельному коллектору. Колонны укрывают от луча Фонаря.', ids: ['yellow'] };
@@ -147,7 +167,7 @@ function getObjective(state: Progress): Objective {
   }
   if (state.chapter === 1) {
     if (!f['lab-terminal']) return { title: 'Запусти анализатор', detail: 'Ищи стол реконструкции к северу от тамбура. Восстанови описания на экране.', ids: ['lab-terminal'] };
-    if (!f.echoSolved) return { title: 'Запиши свой маршрут', detail: 'У стойки ЭХО нажми E. Запиши путь на А, затем запусти повтор и встань на Б.', ids: ['echo'] };
+    if (!f.echoSolved) return { title: 'Синхронизируй две площадки', detail: 'Нажми E у стойки. Дойди до площадки А и задержись на ней. Затем запусти запись со стойки и встань на Б.', ids: ['echo'] };
     if (!f.film) return { title: 'Забери оригинал записи', detail: 'После площадок открылось хранилище плёнок. Оно к северо-востоку от камеры.', ids: ['film'] };
     if (!f.archiveOpen) return { title: 'Открой архивный каталог', detail: 'К югу от хранилища работает охрана. Обойди дрон между стеллажами или отключи его.', ids: ['archive-terminal'] };
     return { title: 'Найди Даню в тоннеле', detail: 'Оригинал записи показывает место аварийного шлюза. Спуск находится на севере.', ids: ['next'] };
@@ -189,7 +209,9 @@ function renderWorldStatus(status: WorldStatus): void {
   hudEcho.hidden = !status.echo;
   if (status.echo) {
     element('echo-label').textContent = status.echo.label;
-    element<HTMLProgressElement>('echo-progress').value = status.echo.ratio;
+    const bar = element<HTMLProgressElement>('echo-progress');
+    bar.hidden = status.echo.phase === 'ready';
+    bar.value = status.echo.ratio;
   }
 }
 
@@ -313,16 +335,22 @@ function interact(object: StationObject): void {
       return;
     case 'surface':
       if (!f.shutter) { toast('Вернись к ручному рычагу и подними заслонку.'); return; }
-      progress.completed = true;
-      persist(true);
-      refreshObjective();
-      world.setPaused(true);
+      completeRun();
       dialogs.story('Утро над городом', [
         line('Даня', 'Наверху уже светло. Ты теперь всё будешь записывать, Байт?'),
         line('Байт', 'Могу выключить.'),
         line('Мира', 'Выключи. Дальше я тебе сама расскажу.'),
       ], showResults, 'ПРОТОКОЛ ЗАВЕРШЁН');
   }
+}
+
+function completeRun(): void {
+  if (!progress) return;
+  progress.completed = true;
+  interactButton.hidden = true;
+  persist(true);
+  refreshObjective();
+  world.setPaused(true);
 }
 
 function openTerminal(id: string): void {
@@ -399,33 +427,49 @@ function voiceLabel(): string {
 }
 
 function score(): Score {
-  const attempts = Object.values(progress?.attempts ?? {});
+  const entries = reportQuestions(progress?.lesson ? progress.chapter : undefined);
+  const attempts = entries.map(({ question }) => progress?.attempts[question.id]).filter(attempt => attempt !== undefined);
+  const topics = new Map<string, Score['review'][number]>();
+  for (const { question } of entries) {
+    const attempt = progress?.attempts[question.id];
+    if (!attempt || (!attempt.errors && !attempt.hints && !attempt.reviewed)) continue;
+    const name = question.subtopic;
+    const topic = topics.get(name) ?? { name, errors: 0, hints: 0, reviewed: false };
+    topic.errors += attempt.errors;
+    topic.hints += attempt.hints;
+    topic.reviewed ||= attempt.reviewed;
+    topics.set(name, topic);
+  }
   return {
     solved: attempts.filter(a => a.passed).length,
-    total: questions.size,
+    total: entries.length,
     independent: attempts.filter(a => a.passed && a.count === 1 && !a.hints && !a.reviewed).length,
     errors: attempts.reduce((sum, a) => sum + a.errors, 0),
-    voice: voiceLabel(),
+    voice: progress?.lesson && progress.chapter < 2 ? null : voiceLabel(),
+    review: [...topics.values()].sort((a, b) => b.errors - a.errors || b.hints - a.hints),
   };
 }
 
 function exportScore(): void {
   if (!progress) return;
-  const lines = ['Задание,Тема,Попытки,Ошибки,Подсказки,Решено,Разбор'];
-  for (const [id, question] of questions) {
-    const a = progress.attempts[id];
-    lines.push([id, `"${question.subtopic.replaceAll('"', '""')}"`, a?.count ?? 0, a?.errors ?? 0, a?.hints ?? 0,
-      a?.passed ? 'да' : 'нет', a?.reviewed ? 'да' : 'нет'].join(','));
+  const rows: (string | number)[][] = [['Глава', 'Задание', 'Раздел', 'Навык', 'Попытки', 'Ошибки', 'Подсказки', 'Итог']];
+  for (const { chapter, question } of reportQuestions(progress.lesson ? progress.chapter : undefined)) {
+    const a = progress.attempts[question.id];
+    const status = a?.passed
+      ? (a.reviewed ? 'После разбора' : a.hints ? 'С подсказкой' : a.count > 1 ? 'Со второй или последующей попытки' : 'С первой попытки')
+      : (a?.count ? 'В работе' : 'Не начато');
+    rows.push([sectors[chapter].name, question.id, question.topic, question.subtopic, a?.count ?? 0, a?.errors ?? 0, a?.hints ?? 0, status]);
   }
-  lines.push(['V06-01', `"Устный ответ — ${voiceLabel()}"`, '', '', '', progress.voice ? 'да' : 'нет', ''].join(','));
+  if (!progress.lesson || progress.chapter === 2) rows.push([sectors[2].name, voiceQuestion.id, 'Устное объяснение', voiceQuestion.subtopic, '', '', '', voiceLabel()]);
+  const lines = rows.map(row => row.map(cell => `"${String(cell).replaceAll('"', '""')}"`).join(';'));
   const url = URL.createObjectURL(new Blob(['\uFEFF', lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
-  link.href = url; link.download = 'station-zero-report.csv'; link.click();
+  link.href = url; link.download = progress.lesson ? `station-zero-chapter-${progress.chapter + 1}-report.csv` : 'station-zero-report.csv'; link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function showResults(): void {
-  dialogs.end(score(), menu, exportScore);
+  if (progress) dialogs.end(score(), menu, exportScore, progress.chapter);
 }
 
 function openSettings(): void {
@@ -450,6 +494,16 @@ function pause(): void {
 
 start.addEventListener('click', () => dialogs.chooseMode((mode: PlayMode) => begin(blankProgress(mode)), !!saved));
 continueButton.addEventListener('click', () => { if (saved) begin(saved); });
+for (const button of lessonButtons) {
+  button.addEventListener('click', () => {
+    const chapter = Number(button.dataset.chapter);
+    const previous = loadProgress(chapter);
+    dialogs.chooseMode(mode => begin(blankLesson(chapter, mode)), false, {
+      chapter, saved: !!previous, completed: previous?.completed ?? false,
+      resume: () => { if (previous) begin(previous); },
+    });
+  });
+}
 element('open-controls').addEventListener('click', () => dialogs.controls());
 element('open-settings').addEventListener('click', openSettings);
 element('open-map').addEventListener('click', openMap);
@@ -458,6 +512,10 @@ element('open-journal').addEventListener('click', () => {
   dialogs.journal((progress?.notes ?? []).map(id => id === 'film' ? 'Оригинал сообщения Дани' : logs[id]?.title ?? id), score(), exportScore);
 });
 interactButton.addEventListener('click', () => world.tap('KeyE'));
+element('reset-echo').addEventListener('click', () => {
+  world.resetEcho();
+  canvas.focus({ preventScroll: true });
+});
 
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'KeyF']);
 const taps = new Set(['KeyE', 'Space', 'KeyR']);

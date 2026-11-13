@@ -33,8 +33,8 @@ export class Geometry {
   }
 
   clear(a: Point, b: Point, radius = 0): boolean {
-    const steps = Math.ceil(distance(a, b) / 9);
-    for (let i = 1; i < steps; i++) {
+    const steps = Math.max(1, Math.ceil(distance(a, b) / 6));
+    for (let i = 1; i <= steps; i++) {
       const progress = i / steps;
       if (this.blocked(a.x + (b.x - a.x) * progress, a.y + (b.y - a.y) * progress, radius)) return false;
     }
@@ -45,7 +45,11 @@ export class Geometry {
     const width = this.sector.width * 2;
     const height = this.sector.height * 2;
     const step = TILE / 2;
-    const index = (p: Point) => Math.floor(p.y / step) * width + Math.floor(p.x / step);
+    const index = (p: Point) => {
+      const x = Math.floor(p.x / step);
+      const y = Math.floor(p.y / step);
+      return x >= 0 && x < width && y >= 0 && y < height ? y * width + x : -1;
+    };
     const center = (i: number) => ({ x: (i % width + .5) * step, y: (Math.floor(i / width) + .5) * step });
     const start = index(from);
     const end = index(to);

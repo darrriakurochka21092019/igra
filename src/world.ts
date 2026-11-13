@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { characterTexture, propTexture, stationTexture, type Character } from './art';
-import { HEIGHT, TILE, WIDTH, sectors, toPoint, type Point, type Sector, type StationObject } from './campaign';
+import { ECHO_LIMIT, ECHO_PAD_RADIUS, HEIGHT, TILE, WIDTH, sectors, toPoint, type EchoSample, type Point, type Sector, type StationObject } from './campaign';
 import { distance, Geometry, inside } from './geometry';
 import { MAX_HEALTH, type Progress, type Settings } from './progress';
 
@@ -8,6 +8,7 @@ interface WorldHooks {
   ready(): void;
   interact(object: StationObject): void;
   event(id: string): void;
+  echoChanged(): void;
   notice(text: string): void;
   sound(cue: 'shot' | 'hit' | 'alert' | 'action' | 'door' | 'echo'): void;
   status(value: WorldStatus): void;
@@ -18,7 +19,7 @@ export interface WorldStatus {
   dash: number;
   nearest?: StationObject;
   target?: { object: StationObject; direction: number; distance: number };
-  echo?: { label: string; ratio: number };
+  echo?: { label: string; ratio: number; phase: 'record' | 'ready' | 'play' };
   room: string;
 }
 
@@ -49,16 +50,15 @@ interface Shot extends Point {
 }
 interface Spark extends Point { dx: number; dy: number; ttl: number; duration: number; color: number }
 interface Emitter { object: StationObject; point: Point; phaseOffset: number; health: number; shotAt: number }
-interface TracePoint extends Point { at: number; face: number; frame: number }
 type EchoState =
-  | { phase: 'record'; started: number; samples: TracePoint[] }
-  | { phase: 'ready'; samples: TracePoint[] }
-  | { phase: 'play'; started: number; samples: TracePoint[]; cursor: number; onA: boolean; overlap: number };
+  | { phase: 'record'; started: number; samples: EchoSample[]; onAFor: number }
+  | { phase: 'ready'; samples: EchoSample[] }
+  | { phase: 'play'; started: number; samples: EchoSample[]; cursor: number; onA: boolean; overlap: number };
 
 const moveKeys = ['KeyA', 'ArrowLeft', 'KeyD', 'ArrowRight', 'KeyW', 'ArrowUp', 'KeyS', 'ArrowDown'];
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const aimAngle = (a: Point, b: Point): number => Math.atan2(b.y - a.y, b.x - a.x);
-const RECORD_TIME = 11000;
+const ECHO_REPLAY_HOLD = 6800;
 const INTERACTION_RANGE = 48;
 const COLORS = { teal: 0x7ce2cf, mint: 0xb8f3de, gold: 0xf2b472, danger: 0xf48373, dark: 0x182a34 };
 
@@ -121,7 +121,9 @@ export class StationWorld extends Phaser.Scene {
     this.statusKey = '';
     this.bullets = [];
     this.sparks = [];
-    this.echo = undefined;
+    this.echo = state.chapter === 1 && state.echoTrace && !state.flags.echoSolved
+      ? { phase: 'ready', samples: state.echoTrace }
+      : undefined;
     this.shotAt = 0;
     this.dashAt = 0;
     this.dashUntil = 0;
@@ -209,26 +211,35 @@ export class StationWorld extends Phaser.Scene {
       this.dashAt = this.clock + 1350;
       this.hooks.sound('action');
     }
-    if (code === 'KeyR' && this.echo && !this.state.flags.echoSolved) {
-      this.clearEcho();
-      this.hooks.notice('Запись очищена. У стойки можно начать заново.');
-    }
+    if (code === 'KeyR') this.resetEcho();
   }
 
   useEcho(): void {
     if (this.state.flags.echoSolved) return;
     if (this.echo?.phase === 'ready') {
       this.echo = { phase: 'play', started: this.clock, samples: this.echo.samples, cursor: 0, onA: false, overlap: 0 };
-      this.ghost = this.actor('mira', this.player);
+      this.ghost = this.actor('mira', this.echo.samples[0]);
       this.ghost.image.setAlpha(.48);
       this.hooks.sound('echo');
       this.hooks.notice('Эхо пошло к площадке А. Встань на площадку Б.');
       return;
     }
     if (this.echo) return;
-    this.echo = { phase: 'record', started: this.clock, samples: [] };
+    this.echo = { phase: 'record', started: this.clock, samples: [this.sampleEcho(0)], onAFor: 0 };
     this.hooks.sound('echo');
-    this.hooks.notice('Запись началась. Дойди до площадки А и стой на ней до конца записи.');
+    this.hooks.notice('Запись идёт. Дойди до площадки А и задержись там на секунду.');
+  }
+
+  resetEcho(): void {
+    if (!this.loaded || this.paused || !this.echo || this.state.flags.echoSolved) return;
+    this.clearEcho();
+    this.state.echoTrace = null;
+    this.hooks.echoChanged();
+    this.hooks.notice('Запись очищена. У стойки можно начать заново.');
+  }
+
+  private sampleEcho(at: number): EchoSample {
+    return { ...this.getPosition(), at, face: this.player.face, frame: this.player.frame };
   }
 
   private clearEcho(): void {
@@ -443,6 +454,7 @@ export class StationWorld extends Phaser.Scene {
     this.invulnerableUntil = this.clock + 2200;
     this.bullets = [];
     this.clearEcho();
+    if (this.state.echoTrace) this.echo = { phase: 'ready', samples: this.state.echoTrace };
     this.enemies.forEach(enemy => {
       if (enemy.down) return;
       enemy.x = enemy.start.x;
@@ -496,19 +508,17 @@ export class StationWorld extends Phaser.Scene {
     const a = toPoint(padA.at);
     const b = toPoint(padB.at);
     if (state.phase === 'record') {
-      if (elapsed - (state.samples.at(-1)?.at ?? -100) >= 46 || elapsed >= RECORD_TIME) {
-        state.samples.push({ ...this.getPosition(), at: elapsed, face: this.player.face, frame: this.player.frame });
-      }
-      if (elapsed >= RECORD_TIME) {
-        const recordedOnA = state.samples.filter(sample => distance(sample, a) < 24).length;
-        if (recordedOnA < 25) {
-          this.clearEcho();
-          this.hooks.notice('Площадка А не удерживалась. Вернись к стойке и запиши путь заново.');
-        } else {
-          this.echo = { phase: 'ready', samples: state.samples };
-          this.hooks.notice('Маршрут записан. Вернись к стойке, запусти эхо и иди на площадку Б.');
-          this.hooks.sound('echo');
-        }
+      state.onAFor = distance(this.player, a) < ECHO_PAD_RADIUS ? state.onAFor + milliseconds : 0;
+      if (elapsed - state.samples.at(-1)!.at >= 46 || state.onAFor >= 850) state.samples.push(this.sampleEcho(elapsed));
+      if (state.onAFor >= 850) {
+        this.echo = { phase: 'ready', samples: state.samples };
+        this.state.echoTrace = state.samples;
+        this.hooks.echoChanged();
+        this.hooks.notice('Маршрут сохранён. Вернись к стойке, запусти эхо и иди на площадку Б.');
+        this.hooks.sound('echo');
+      } else if (elapsed >= ECHO_LIMIT) {
+        this.clearEcho();
+        this.hooks.notice('Время записи вышло. Попробуй ещё раз у стойки ЭХО.');
       }
       return;
     }
@@ -520,15 +530,16 @@ export class StationWorld extends Phaser.Scene {
       const x = from.x + (next.x - from.x) * fraction;
       const y = from.y + (next.y - from.y) * fraction;
       this.ghost.image.setPosition(x, y).setDepth(y + 2).setTexture(characterTexture(this, 'mira', from.face, from.frame));
-      state.onA = distance({ x, y }, a) < 24;
-      state.overlap = state.onA && distance(this.player, b) < 24 ? state.overlap + milliseconds : 0;
+      state.onA = distance({ x, y }, a) < ECHO_PAD_RADIUS;
+      state.overlap = state.onA && distance(this.player, b) < ECHO_PAD_RADIUS ? state.overlap + milliseconds : 0;
     }
     if (state.overlap >= 530) {
       this.clearEcho();
+      this.state.echoTrace = null;
       this.hooks.event('echoSolved');
       this.hooks.sound('door');
       this.hooks.notice('Две площадки удерживаются. Обе двери камеры открыты.');
-    } else if (elapsed >= RECORD_TIME) {
+    } else if (elapsed >= state.samples.at(-1)!.at + ECHO_REPLAY_HOLD) {
       this.ghost?.image.destroy();
       this.ghost = undefined;
       this.echo = { phase: 'ready', samples: state.samples };
@@ -548,11 +559,14 @@ export class StationWorld extends Phaser.Scene {
     let min = INTERACTION_RANGE;
     for (const object of this.sector.objects) {
       if (object.kind === 'pad' || (this.finished(object) && object.kind !== 'log' && object.kind !== 'terminal')) continue;
+      if (object.id === 'echo' && this.echo && this.echo.phase !== 'ready') continue;
       const point = toPoint(object.at);
       const gap = distance(point, this.player);
       if (gap < min && this.geometry.clear(this.player, point)) {
         min = gap;
-        nearest = object;
+        nearest = object.id === 'echo' && this.echo?.phase === 'ready'
+          ? { ...object, label: 'Воспроизвести запись ЭХО' }
+          : object;
       }
     }
     return nearest;
@@ -571,9 +585,7 @@ export class StationWorld extends Phaser.Scene {
     const target = this.sector.objects.filter(object => this.targetPoints().includes(object.id))
       .map(object => ({ object, point: toPoint(object.at) }))
       .sort((a, b) => distance(this.player, a.point) - distance(this.player, b.point))[0];
-    const echo = this.echo?.phase === 'record' || this.echo?.phase === 'play'
-      ? { label: this.echo.phase === 'record' ? 'Запись маршрута' : 'Воспроизведение ЭХО', ratio: clamp(1 - (this.clock - this.echo.started) / RECORD_TIME, 0, 1) }
-      : undefined;
+    const echo = this.echoStatus();
     const roomIndex = this.geometry.grid[Math.floor(this.player.y / TILE)]?.[Math.floor(this.player.x / TILE)];
     const room = roomIndex ? this.sector.rooms[roomIndex - 1]?.name ?? this.sector.location : 'Служебный переход';
     const nearby = this.nearest();
@@ -604,6 +616,18 @@ export class StationWorld extends Phaser.Scene {
       health: this.health, dash, room, echo, nearest: nearby,
       target: target ? { object: target.object, direction, distance: gap } : undefined,
     });
+  }
+
+  private echoStatus(): WorldStatus['echo'] {
+    const echo = this.echo;
+    if (!echo) return undefined;
+    if (echo.phase === 'ready') return { phase: 'ready', label: 'Запись готова. Вернись к стойке ЭХО', ratio: 1 };
+    const duration = echo.phase === 'record' ? ECHO_LIMIT : echo.samples.at(-1)!.at + ECHO_REPLAY_HOLD;
+    return {
+      phase: echo.phase,
+      label: echo.phase === 'record' ? 'Запись маршрута · площадка А' : 'Воспроизведение · площадка Б',
+      ratio: clamp(1 - (this.clock - echo.started) / duration, 0, 1),
+    };
   }
 
   private drawFixtures(): void {
@@ -647,7 +671,7 @@ export class StationWorld extends Phaser.Scene {
       if (object.kind === 'breaker' && !done) color = object.id === 'yellow' ? 0xffc570 : 0x73bde8;
       if ((object.kind === 'pickup' || object.kind === 'cage') && done) continue;
       if (object.kind === 'pad') {
-        const active = this.state.flags.echoSolved || distance(this.player, at) < 24 ||
+        const active = this.state.flags.echoSolved || distance(this.player, at) < ECHO_PAD_RADIUS ||
           (object.id === 'pad-a' && this.echo?.phase === 'play' && this.echo.onA);
         g.fillStyle(0x122c37).fillRect(x - 24, y - 24, 48, 48);
         g.lineStyle(2, active ? COLORS.teal : color, active ? .93 : .67).strokeRect(x - 22, y - 22, 44, 44);

@@ -34,11 +34,14 @@
         </div>
         <div class="cover-footer"><span class="cover-line"></span> СЛУЖЕБНАЯ ЛИНИЯ МЕТРО <span class="cover-index">/ 00</span></div>
       </div>
-      <ol class="chapter-line" aria-label="Главы">
-        <li><span class="chapter-number">01</span><span><strong>Последний поезд</strong><small>Восстанови питание</small></span></li>
-        <li><span class="chapter-number">02</span><span><strong>Архив смен</strong><small>Используй свой повтор</small></span></li>
-        <li><span class="chapter-number">03</span><span><strong>Живой выход</strong><small>Выведи Даню на поверхность</small></span></li>
-      </ol>
+      <section class="chapter-picker" aria-labelledby="chapter-picker-title">
+        <h2 id="chapter-picker-title">Открыть отдельную главу</h2>
+        <ol class="chapter-line">
+          <li><button type="button" data-chapter="0"><span class="chapter-number" aria-hidden="true">01</span><span><strong>Последний поезд</strong><small>Причастия: образование, Н и НН, НЕ</small></span><span class="chapter-link" aria-hidden="true">→</span></button></li>
+          <li><button type="button" data-chapter="1"><span class="chapter-number" aria-hidden="true">02</span><span><strong>Архив смен</strong><small>Причастный оборот и запятые</small></span><span class="chapter-link" aria-hidden="true">→</span></button></li>
+          <li><button type="button" data-chapter="2"><span class="chapter-number" aria-hidden="true">03</span><span><strong>Живой выход</strong><small>Деепричастия и устное объяснение</small></span><span class="chapter-link" aria-hidden="true">→</span></button></li>
+        </ol>
+      </section>
       <p class="home-meta"><span>Русский язык</span><span>Причастия и деепричастия</span><span>Самостоятельно или с преподавателем</span></p>
     </section>
 
@@ -64,6 +67,7 @@
             <div id="echo-hud" class="echo-hud" hidden>
               <span id="echo-label"></span>
               <progress id="echo-progress" aria-label="Время записи" max="1"></progress>
+              <button id="reset-echo" class="text-button" type="button">Сбросить запись</button>
             </div>
             <button id="interact" class="interaction" type="button" hidden><kbd>E</kbd><span></span></button>
             <p id="notice" class="notice" role="status" hidden></p>
@@ -100,7 +104,7 @@
             <div class="dash-meter"><span>Рывок</span><progress id="dash" max="1" value="1" aria-label="Заряд рывка"></progress></div>
           </section>
           <section class="side-block">
-            <div class="side-label">ХОД ПРОХОЖДЕНИЯ</div>
+            <div id="progress-label" class="side-label">ХОД ПРОХОЖДЕНИЯ</div>
             <ol id="chapter-progress" class="chapter-progress">
               <li><span>01</span> Последний поезд</li>
               <li><span>02</span> Архив смен</li>

@@ -1,5 +1,5 @@
-import { TILE, type Line, type Point, type Sector } from './campaign';
-import { floorGrid } from './geometry';
+import { sectors, TILE, toPoint, type Line, type Point, type Sector } from './campaign';
+import { distance, Geometry } from './geometry';
 import { answerText, evaluate, type VoiceQuestion, type WrittenQuestion } from './learning';
 import type { Attempt, PlayMode, Settings } from './progress';
 
@@ -49,6 +49,7 @@ export class StationDialogs {
   private body = element('dialog-content');
   private closeButton = element<HTMLButtonElement>('close-dialog');
   private cleanup: (() => void) | undefined;
+  private afterClose: (() => void) | undefined;
 
   constructor(private onOpen: () => void, private onClose: () => void) {
     this.closeButton.addEventListener('click', () => this.close());
@@ -63,6 +64,7 @@ export class StationDialogs {
   private show(label: string, title: string): HTMLElement {
     this.cleanup?.();
     this.cleanup = undefined;
+    this.afterClose = undefined;
     this.label.textContent = label;
     this.title.textContent = title;
     this.body.replaceChildren();
@@ -77,19 +79,24 @@ export class StationDialogs {
     this.cleanup?.();
     this.cleanup = undefined;
     if (!this.dialog.open) return;
+    const afterClose = this.afterClose;
+    this.afterClose = undefined;
     this.dialog.close();
     this.onClose();
+    afterClose?.();
   }
 
-  chooseMode(callback: (mode: PlayMode) => void, hasSave: boolean): void {
-    const body = this.show('НАЧАЛО ИГРЫ', 'Как будем проходить?');
-    if (hasSave) body.append(create('p', 'Новая игра заменит сохранённое прохождение в этом браузере.', 'dialog-copy'));
+  chooseMode(callback: (mode: PlayMode) => void, hasSave: boolean, lesson?: { chapter: number; saved: boolean; completed: boolean; resume(): void }): void {
+    const body = this.show(lesson ? 'ОТДЕЛЬНАЯ ГЛАВА' : 'НАЧАЛО ИГРЫ', lesson ? sectors[lesson.chapter].name : 'Как будем проходить?');
+    if (lesson) body.append(create('p', 'Эту главу можно пройти отдельно и скачать отчёт по её заданиям.', 'dialog-copy'));
+    if (hasSave) body.append(create('p', 'Новая кампания заменит сохранённое прохождение всей игры в этом браузере.', 'dialog-copy'));
     const form = create('form');
+    const hasVoice = !lesson || lesson.chapter === 2;
     const modes = [
-      { id: 'solo' as const, title: 'Самостоятельно', description: 'Письменные ответы проверит игра. В финале произнеси объяснение вслух и сверь его с образцом.' },
-      { id: 'teacher' as const, title: 'С преподавателем', description: 'В финале преподаватель выслушает ответ и подтвердит выполнение по критериям.' },
+      { id: 'solo' as const, title: 'Самостоятельно', description: 'Письменные ответы проверит игра. Устное объяснение можно сверить с образцом.' },
+      { id: 'teacher' as const, title: 'С преподавателем', description: 'Преподаватель слушает устное объяснение и подтверждает его по критериям.' },
     ];
-    modes.forEach(mode => {
+    if (hasVoice) modes.forEach(mode => {
       const label = create('label', undefined, 'radio-line');
       const input = create('input');
       input.type = 'radio'; input.name = 'mode'; input.value = mode.id; input.checked = mode.id === 'solo';
@@ -98,9 +105,13 @@ export class StationDialogs {
       label.append(input, copy);
       form.append(label);
     });
-    const start = create('button', 'Спуститься на станцию', 'button primary');
+    const start = create('button', lesson ? (lesson.saved ? 'Начать главу заново' : 'Начать главу') : 'Спуститься на станцию', lesson?.saved ? 'button secondary' : 'button primary');
     start.type = 'submit';
-    form.append(actions(start));
+    if (lesson?.saved) {
+      const resumeLabel = lesson.completed ? 'Посмотреть итоги главы' : 'Продолжить главу';
+      form.append(actions(button(resumeLabel, () => { this.close(); lesson.resume(); }, true), start));
+    }
+    else form.append(actions(start));
     form.addEventListener('submit', event => {
       event.preventDefault();
       const mode = new FormData(form).get('mode') === 'teacher' ? 'teacher' : 'solo';
@@ -171,7 +182,8 @@ export class StationDialogs {
     dialogue.append(speaker, speech);
     let page = 0;
     const counter = create('span', undefined, 'dialog-counter');
-    const finish = () => { this.close(); done?.(); };
+    const finish = () => this.close();
+    this.afterClose = done;
     const next = button('Дальше →', () => {
       page++;
       if (page === lines.length) finish();
@@ -198,7 +210,8 @@ export class StationDialogs {
     canvas.setAttribute('aria-label', 'Схема сектора. Текущая цель выделена оранжевым, положение Миры — мятным.');
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      const grid = floorGrid(sector);
+      const geometry = new Geometry(sector, flags);
+      const { grid } = geometry;
       const size = canvas.width / sector.width;
       for (let y = 0; y < sector.height; y++) for (let x = 0; x < sector.width; x++) {
         const area = grid[y][x];
@@ -213,6 +226,21 @@ export class StationDialogs {
         ctx.font = '10px Arial';
         ctx.fillStyle = '#d4e4df';
         ctx.fillText(room.name, (x + .5) * size, (y + 1.9) * size, (w - .8) * size);
+      }
+      const waypoints = sector.objects.filter(object => targets.includes(object.id)).flatMap(object => {
+        const route = geometry.route(player, toPoint(object.at));
+        return route.length ? [{ route, length: distance(player, route[0]) +
+          route.slice(1).reduce((sum, point, i) => sum + distance(point, route[i]), 0) }] : [];
+      }).sort((a, b) => a.length - b.length)[0];
+      if (waypoints) {
+        ctx.beginPath();
+        ctx.moveTo(player.x / TILE * size, player.y / TILE * size);
+        for (const point of waypoints.route) ctx.lineTo(point.x / TILE * size, point.y / TILE * size);
+        ctx.strokeStyle = '#b7dac8';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
       for (const gate of sector.gates) {
         if (flags[gate.opensWith]) continue;
@@ -231,7 +259,7 @@ export class StationDialogs {
       ctx.fill();
     }
     const labels = sector.objects.filter(object => targets.includes(object.id)).map(object => object.label);
-    body.append(canvas, create('p', labels.length ? `Текущая цель — ${labels.join(' и ')}. Мятная точка показывает, где находится Мира.` : 'Мятная точка показывает, где находится Мира.', 'feedback'), actions(button('Вернуться', () => this.close(), true)));
+    body.append(canvas, create('p', labels.length ? `Цель — ${labels.join(' или ')}. Пунктир показывает путь по открытым проходам.` : 'Мятная точка показывает, где находится Мира.', 'feedback'), actions(button('Вернуться', () => this.close(), true)));
   }
 
   written(name: string, question: WrittenQuestion, index: number, total: number, hooks: WrittenHooks): void {
@@ -269,7 +297,7 @@ export class StationDialogs {
     const review = button('Посмотреть разбор', () => {
       hooks.attempt.reviewed = true;
       hooks.changed();
-      showFeedback(answerText(question), `${question.explanation} Введи ответ, чтобы применить команду.`, '');
+      showFeedback(answerText(question), `${question.explanation} Выполни задание, чтобы применить команду.`, '');
     });
     review.hidden = hooks.attempt.errors < 3;
     const submit = create('button', 'Проверить', 'button primary');
@@ -437,9 +465,15 @@ export class StationDialogs {
     body.append(actions(button('Вернуться', () => this.close(), true), button('Скачать отчёт', exportScore)));
   }
 
-  end(score: Score, menu: () => void, exportScore: () => void): void {
-    const body = this.show('ЭВАКУАЦИЯ ЗАВЕРШЕНА', 'Вы на поверхности');
-    body.append(create('p', 'Даня в безопасности. Байт унёс копию записи Беловой, а станция сохранила правильный маршрут выхода.', 'dialog-copy'));
+  end(score: Score, menu: () => void, exportScore: () => void, chapter: number): void {
+    const evacuated = chapter === 2;
+    const body = this.show(evacuated ? 'ЭВАКУАЦИЯ ЗАВЕРШЕНА' : 'ГЛАВА ПРОЙДЕНА', evacuated ? 'Вы на поверхности' : sectors[chapter].name);
+    const endings = [
+      'Питание восстановлено. Байт свободен, и путь в лабораторию открыт.',
+      'Мира нашла исходную запись и выяснила, где Даня. Путь в тоннель открыт.',
+      'Даня в безопасности. Байт унёс копию записи Беловой, а станция сохранила правильный маршрут выхода.',
+    ];
+    body.append(create('p', endings[chapter], 'dialog-copy'));
     this.score(body, score);
     body.append(actions(button('В главное меню', () => { this.close(); menu(); }, true), button('Скачать отчёт', exportScore)));
   }
@@ -453,8 +487,25 @@ export class StationDialogs {
     ]) {
       const card = create('div'); card.append(create('strong', value), create('small', caption)); grid.append(card);
     }
-    body.append(grid, create('p', `Устный ответ — ${score.voice}.`, 'dialog-copy'));
+    body.append(grid);
+    if (score.voice) body.append(create('p', `Устный ответ — ${score.voice}.`, 'dialog-copy'));
+    if (score.review.length) {
+      body.append(create('h3', 'Темы для повторения', 'review-heading'));
+      const list = create('ul', undefined, 'review-list');
+      for (const topic of score.review) {
+        const reasons = [topic.errors && `ошибок — ${topic.errors}`, topic.hints && `подсказок — ${topic.hints}`, topic.reviewed && 'открывали разбор'].filter(Boolean);
+        list.append(create('li', `${topic.name} · ${reasons.join(', ')}`));
+      }
+      body.append(list);
+    }
   }
 }
 
-export interface Score { solved: number; total: number; independent: number; errors: number; voice: string }
+export interface Score {
+  solved: number;
+  total: number;
+  independent: number;
+  errors: number;
+  voice: string | null;
+  review: { name: string; errors: number; hints: number; reviewed: boolean }[];
+}

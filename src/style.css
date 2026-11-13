@@ -66,9 +66,13 @@ nav { display: flex; gap: 4px; }
 .cover-footer { position: absolute; left: clamp(25px, 6.4vw, 99px); bottom: 27px; color: #a8c0b8; font: 700 .65rem/1 "Courier New", monospace; letter-spacing: .12em; }
 .cover-line { display: inline-block; width: 30px; height: 1px; margin-right: 9px; background: #8bdac2; vertical-align: .2em; }
 .cover-index { margin-left: 4px; color: var(--amber); }
-.chapter-line { display: grid; grid-template-columns: repeat(3, 1fr); margin: 13px 0 0; padding: 0; list-style: none; border: 1px solid var(--line); background: #101b22; }
-.chapter-line li { display: flex; align-items: center; gap: 16px; min-height: 80px; padding: 14px 20px; }
+.chapter-picker h2 { margin: 16px 0 8px; color: #bfceca; font-size: .86rem; font-weight: 660; }
+.chapter-line { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); background: #101b22; }
+.chapter-line button { display: flex; align-items: center; gap: 16px; min-height: 73px; width: 100%; height: 100%; padding: 12px 16px; color: inherit; background: transparent; border: 0; text-align: left; }
+.chapter-line button:hover { background: #192d32; }
+.chapter-line button:focus-visible { outline-offset: -3px; }
 .chapter-line li + li { border-left: 1px solid var(--line); }
+.chapter-link { margin-left: auto; color: var(--teal); font-size: 1.15rem; }
 .chapter-number { color: #82c7b7; font: 700 1.13rem "Courier New", monospace; padding: 8px 9px; border: 1px solid #355658; background: #172a2e; }
 .chapter-line strong, .chapter-line small { display: block; }
 .chapter-line strong { font-size: .91rem; margin-bottom: 4px; }
@@ -93,6 +97,7 @@ nav { display: flex; gap: 4px; }
 .notice { pointer-events: none; position: absolute; left: 12px; right: 12px; bottom: 55px; width: max-content; max-width: calc(100% - 24px); margin: 0 auto; padding: 8px 11px; background: #0a1820ee; border: 1px solid #65817e; color: #dff6ed; font-size: .79rem; line-height: 1.35; }
 .echo-hud { pointer-events: none; position: absolute; top: 48px; left: 11px; min-width: min(190px, 56%); padding: 7px 10px; background: #0a1820e8; border: 1px solid #517070; color: var(--teal); font-size: .75rem; }
 .echo-hud progress { display: block; margin-top: 5px; width: 100%; height: 5px; }
+.echo-hud .text-button { display: block; pointer-events: auto; margin-top: 4px; padding: 5px 0 2px; }
 .command-strip { display: flex; gap: 7px 17px; flex-wrap: wrap; padding: 12px 0; color: var(--muted); font-size: .75rem; }
 kbd { display: inline-grid; vertical-align: .02em; place-items: center; font: 700 .69rem/1.1 "Courier New", monospace; color: #d7e9e6; background: #20313a; border: 1px solid #435e65; padding: 4px 6px; min-width: 20px; }
 .command-strip kbd { margin-right: 4px; }
@@ -167,6 +172,9 @@ progress { accent-color: var(--teal); }
 .stat-grid div { padding: 10px 9px; border: 1px solid #3b555d; background: #142630; }
 .stat-grid strong { display: block; color: var(--teal); font-size: 1.28rem; }
 .stat-grid small { font-size: .73rem; color: #a5c0ba; }
+.review-heading { margin: 16px 0 6px; font-size: .94rem; }
+.review-list { margin: 0; padding-left: 18px; color: #c1d7d0; font-size: .83rem; line-height: 1.45; }
+.review-list li + li { margin-top: 4px; }
 .voice-tools audio { width: 100%; height: 33px; margin-top: 8px; }
 .touch-controls { display: none; }
 
@@ -180,7 +188,7 @@ progress { accent-color: var(--teal); }
   .side-block:nth-child(2) { border-top: 0; border-left: 1px solid var(--line); }
   .side-block:last-child { grid-column: 1 / -1; }
   .chapter-progress { display: flex; gap: 11px; flex-wrap: wrap; }
-  .chapter-line li { gap: 9px; padding: 11px; }
+  .chapter-line button { gap: 9px; padding: 11px; }
 }
 @media (max-width: 540px) {
   .topbar, .home, .play { padding-inline: 11px; }
@@ -195,7 +203,7 @@ progress { accent-color: var(--teal); }
   .cover-copy h1 { font-size: clamp(3.25rem, 12vw, 4.25rem); }
   .premise { max-width: 290px; }
   .chapter-line { grid-template-columns: 1fr; }
-  .chapter-line li { min-height: 58px; }
+  .chapter-line button { min-height: 58px; }
   .chapter-line li + li { border-left: 0; border-top: 1px solid var(--line); }
   .play-heading { padding-top: 13px; }
   .top-actions kbd { display: none; }

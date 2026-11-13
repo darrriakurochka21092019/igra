@@ -3,6 +3,9 @@ export const WIDTH = 640;
 export const HEIGHT = 360;
 
 export interface Point { x: number; y: number }
+export interface EchoSample extends Point { at: number; face: number; frame: number }
+export const ECHO_LIMIT = 16000;
+export const ECHO_PAD_RADIUS = 24;
 export type Rect = readonly [x: number, y: number, width: number, height: number];
 export type ObjectKind = 'pickup' | 'breaker' | 'terminal' | 'cage' | 'door' | 'log' | 'echo' | 'pad' | 'radio' | 'emitter' | 'lever' | 'exit';
 export interface StationObject {
@@ -19,6 +22,7 @@ export interface Sector {
   name: string;
   location: string;
   subtitle: string;
+  lessonIntro: string;
   width: number;
   height: number;
   spawn: readonly [number, number];
@@ -38,6 +42,7 @@ export const sectors: Sector[] = [
     name: 'Последний поезд',
     location: 'Платформа',
     subtitle: 'Ответь на сигнал Дани',
+    lessonIntro: 'Даня отправил сообщение с закрытой станции. Мира только что спустилась на платформу. Найди комплект и верни питание.',
     width: 66, height: 43, spawn: [9.6, 28.7],
     rooms: [
       { name: 'Вестибюль', area: [3, 24, 13, 12], surface: 'metro' },
@@ -81,6 +86,7 @@ export const sectors: Sector[] = [
     name: 'Архив смен',
     location: 'Лаборатория',
     subtitle: 'Найди подлинную запись',
+    lessonIntro: 'Мира освободила ремонтного робота Байта. Вместе они ищут подлинное сообщение Дани в архиве станции.',
     width: 76, height: 43, spawn: [5.5, 29.5],
     rooms: [
       { name: 'Технический тамбур', area: [3, 24, 13, 12], surface: 'work' },
@@ -121,6 +127,7 @@ export const sectors: Sector[] = [
     name: 'Живой выход',
     location: 'Аварийный тоннель',
     subtitle: 'Выведи Даню на поверхность',
+    lessonIntro: 'Подлинная запись привела Миру и Байта к аварийному тоннелю. Даня ждёт за стеклом шлюза.',
     width: 80, height: 45, spawn: [5.5, 28.5],
     rooms: [
       { name: 'Вход в коллектор', area: [3, 23, 14, 13], surface: 'tunnel' },
@@ -188,7 +195,7 @@ export const logs: Record<string, { title: string; lines: Line[] }> = {
   },
   'lab-log': {
     title: 'Две площадки',
-    lines: [line('Белова · инструкция', 'Запишите, как оператор идёт от стойки на площадку А, и задержитесь там. После возврата к стойке запустите запись и сами встаньте на площадку Б. Один оператор, две дорожки, один момент нажатия.')],
+    lines: [line('Белова · инструкция', 'Запишите путь от стойки до площадки А. Задержитесь на ней, пока стойка не сохранит запись. Затем вернитесь к стойке и запустите повтор. Пока эхо удерживает площадку А, встаньте на площадку Б.')],
   },
   'belova-log': {
     title: 'Механическая заслонка',
