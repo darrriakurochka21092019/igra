@@ -29,13 +29,38 @@ export type WrittenQuestion = SelectionQuestion | TextQuestion | FieldsQuestion;
 export type VoiceQuestion = BaseQuestion & { answer: { model: string; alternatives: string[] } };
 
 export const terminals: Record<string, { name: string; chapter: number; questions: string[] }> = {
-  'platform-terminal': { name: 'Панель ремонтной клетки', chapter: 0, questions: ['C01-01', 'C02-01', 'C03-03'] },
-  'service-terminal': { name: 'Терминал перехода', chapter: 0, questions: ['C03-05'] },
-  'lab-terminal': { name: 'Анализатор записей', chapter: 1, questions: ['C04-01', 'C04-03'] },
-  'archive-terminal': { name: 'Архивный каталог', chapter: 1, questions: ['C04-06'] },
-  'route-terminal': { name: 'Панель маршрута', chapter: 2, questions: ['C05-03', 'C05-04', 'C05-06'] },
-  'shutter-terminal': { name: 'Терминал заслонки', chapter: 2, questions: ['C06-03', 'C06-05'] },
+  'platform-terminal': {
+    name: 'Панель ремонтной клетки', chapter: 0,
+    questions: ['C01-01', 'C01-03', 'C02-01', 'C02-05', 'C03-03'],
+  },
+  'service-terminal': {
+    name: 'Терминал перехода', chapter: 0,
+    questions: ['C03-04', 'C03-05', 'C03-14'],
+  },
+  'lab-terminal': {
+    name: 'Анализатор записей', chapter: 1,
+    questions: ['C04-01', 'C04-02', 'C04-04', 'C04-03'],
+  },
+  'archive-terminal': {
+    name: 'Архивный каталог', chapter: 1,
+    questions: ['C04-07', 'C04-16', 'C04-06', 'C04-13'],
+  },
+  'route-terminal': {
+    name: 'Панель маршрута', chapter: 2,
+    questions: ['C05-03', 'C05-04', 'C05-05', 'C05-06', 'C05-17'],
+  },
+  'shutter-terminal': {
+    name: 'Терминал заслонки', chapter: 2,
+    questions: ['C06-03', 'C06-07', 'C06-05'],
+  },
 };
+
+// Finished terminals in older saves keep the assignments the player could access.
+const originalQuestionIds = new Set([
+  'C01-01', 'C02-01', 'C03-03', 'C03-05',
+  'C04-01', 'C04-03', 'C04-06',
+  'C05-03', 'C05-04', 'C05-06', 'C06-03', 'C06-05',
+]);
 
 const requested = new Set(Object.values(terminals).flatMap(terminal => terminal.questions));
 export const questions = new Map(
@@ -47,10 +72,16 @@ const finalVoice = oral.questions.find(question => question.id === 'V06-01');
 if (questions.size !== requested.size || !finalVoice) throw new Error('В кампании есть ссылка на отсутствующее задание.');
 export const voiceQuestion: VoiceQuestion = finalVoice;
 
-export function reportQuestions(lessonChapter?: number) {
-  return Object.values(terminals)
-    .filter(terminal => lessonChapter === undefined || terminal.chapter === lessonChapter)
-    .flatMap(terminal => terminal.questions.map(id => ({ question: questions.get(id)!, chapter: terminal.chapter })));
+export function terminalQuestionIds(id: string, originalTerminals: readonly string[]): string[] {
+  const ids = terminals[id].questions;
+  return originalTerminals.includes(id) ? ids.filter(questionId => originalQuestionIds.has(questionId)) : ids;
+}
+
+export function reportQuestions(lessonChapter?: number, originalTerminals: readonly string[] = []) {
+  return Object.entries(terminals)
+    .filter(([, terminal]) => lessonChapter === undefined || terminal.chapter === lessonChapter)
+    .flatMap(([id, terminal]) => terminalQuestionIds(id, originalTerminals)
+      .map(questionId => ({ question: questions.get(questionId)!, chapter: terminal.chapter })));
 }
 
 function normalize(text: string, strictYo = false): string {

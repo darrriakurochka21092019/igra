@@ -1,4 +1,5 @@
 import { ECHO_LIMIT, ECHO_PAD_RADIUS, TILE, sectors, toPoint, type EchoSample, type Point } from './campaign';
+import { terminals } from './learning';
 
 const SAVE_KEY = 'station-zero-v1';
 const SETTINGS_KEY = 'station-zero-settings-v1';
@@ -20,6 +21,7 @@ export interface Progress {
   checkpoint: Point | null;
   echoTrace: EchoSample[] | null;
   flags: Record<string, boolean>;
+  originalTerminals: string[];
   attempts: Record<string, Attempt>;
   notes: string[];
   voice: 'self' | 'teacher' | null;
@@ -32,8 +34,8 @@ export interface Settings {
 }
 
 export const blankProgress = (mode: PlayMode): Progress => ({
-  version: 1, chapter: 0, lesson: false, mode, checkpoint: null, echoTrace: null, flags: {}, attempts: {}, notes: [],
-  voice: null, completed: false,
+  version: 1, chapter: 0, lesson: false, mode, checkpoint: null, echoTrace: null, flags: {},
+  originalTerminals: [], attempts: {}, notes: [], voice: null, completed: false,
 });
 
 export function blankLesson(chapter: number, mode: PlayMode): Progress {
@@ -110,6 +112,12 @@ export function loadProgress(lessonChapter?: number): Progress | null {
     Object.assign(clean.flags, Object.fromEntries(Object.entries(value.flags)
       .filter(([key, flag]) => flag === true && /^[a-z][a-z0-9-]*$/iu.test(key) && !Object.hasOwn(Object.prototype, key))));
   }
+  const originalTerminals = value.originalTerminals;
+  clean.originalTerminals = Object.entries(terminals).filter(([id, terminal]) => {
+    if (Array.isArray(originalTerminals)) return originalTerminals.includes(id);
+    return (lessonChapter === undefined || terminal.chapter === lessonChapter) &&
+      (clean.completed || terminal.chapter < clean.chapter || clean.flags[id]);
+  }).map(([id]) => id);
   if (clean.chapter === 1 && !clean.flags.echoSolved) clean.echoTrace = loadEchoTrace(value.echoTrace);
   if (Array.isArray(value.notes)) clean.notes = value.notes.filter((note): note is string => typeof note === 'string');
   if (record(value.attempts)) {

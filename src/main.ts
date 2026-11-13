@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { intro, line, logs, sectors, type StationObject } from './campaign';
 import { element, StationDialogs, type Score } from './dialogs';
-import { questions, reportQuestions, terminals, voiceQuestion } from './learning';
+import { questions, reportQuestions, terminalQuestionIds, terminals, voiceQuestion } from './learning';
 import { blankLesson, blankProgress, loadProgress, loadSettings, MAX_HEALTH, saveProgress, saveSettings, type PlayMode, type Progress } from './progress';
 import { StationSound } from './sound';
 import { engineConfig, StationWorld, type WorldStatus } from './world';
@@ -370,12 +370,13 @@ function openTerminal(id: string): void {
     else toast('Эта команда уже сохранена.');
     return;
   }
-  const index = terminal.questions.findIndex(questionId => !progress?.attempts[questionId]?.passed);
+  const ids = terminalQuestionIds(id, progress.originalTerminals);
+  const index = ids.findIndex(questionId => !progress?.attempts[questionId]?.passed);
   if (index < 0) { applyTerminal(id); return; }
-  const question = questions.get(terminal.questions[index])!;
+  const question = questions.get(ids[index])!;
   const attempt = progress.attempts[question.id] ?? { count: 0, errors: 0, hints: 0, passed: false, reviewed: false };
   progress.attempts[question.id] = attempt;
-  dialogs.written(terminal.name, question, index, terminal.questions.length, {
+  dialogs.written(terminal.name, question, index, ids.length, {
     attempt,
     changed: () => persist(),
     finished: () => openTerminal(id),
@@ -427,7 +428,7 @@ function voiceLabel(): string {
 }
 
 function score(): Score {
-  const entries = reportQuestions(progress?.lesson ? progress.chapter : undefined);
+  const entries = reportQuestions(progress?.lesson ? progress.chapter : undefined, progress?.originalTerminals);
   const attempts = entries.map(({ question }) => progress?.attempts[question.id]).filter(attempt => attempt !== undefined);
   const topics = new Map<string, Score['review'][number]>();
   for (const { question } of entries) {
@@ -453,7 +454,7 @@ function score(): Score {
 function exportScore(): void {
   if (!progress) return;
   const rows: (string | number)[][] = [['Глава', 'Задание', 'Раздел', 'Навык', 'Попытки', 'Ошибки', 'Подсказки', 'Итог']];
-  for (const { chapter, question } of reportQuestions(progress.lesson ? progress.chapter : undefined)) {
+  for (const { chapter, question } of reportQuestions(progress.lesson ? progress.chapter : undefined, progress.originalTerminals)) {
     const a = progress.attempts[question.id];
     const status = a?.passed
       ? (a.reviewed ? 'После разбора' : a.hints ? 'С подсказкой' : a.count > 1 ? 'Со второй или последующей попытки' : 'С первой попытки')
@@ -543,4 +544,5 @@ document.querySelectorAll<HTMLButtonElement>('[data-tap]').forEach(button => {
   button.addEventListener('click', () => world.tap(button.dataset.tap!));
 });
 
+element('task-count').textContent = `Заданий по русскому языку — ${reportQuestions().length + 1}`;
 refreshHome();
