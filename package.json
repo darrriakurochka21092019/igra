@@ -1,0 +1,16 @@
+{
+  "name": "station-zero-echo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host 0.0.0.0",
+    "portable": "node scripts/package-standalone.mjs"
+  },
+  "engines": { "node": ">=22.12" },
+  "dependencies": { "phaser": "4.2.1" },
+  "devDependencies": { "typescript": "5.9.3", "vite": "7.3.1" }
+}

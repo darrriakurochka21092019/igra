@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Станция Ноль — файл банка заданий",
+  "type": "object",
+  "required": ["schemaVersion", "questions"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "chapter": { "$ref": "#/$defs/chapter" },
+    "title": { "$ref": "#/$defs/nonEmpty" },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/question" }
+    }
+  },
+  "dependentRequired": {
+    "chapter": ["title"],
+    "title": ["chapter"]
+  },
+  "if": { "required": ["chapter"] },
+  "then": {
+    "properties": {
+      "questions": {
+        "items": { "properties": { "interaction": { "not": { "const": "oral" } } } }
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "questions": { "items": { "properties": { "interaction": { "const": "oral" } } } }
+    }
+  },
+  "$defs": {
+    "nonEmpty": { "type": "string", "pattern": "\\S" },
+    "chapter": { "type": "integer", "minimum": 1, "maximum": 6 },
+    "list": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonEmpty" }
+    },
+    "alternatives": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonEmpty" }
+    },
+    "textAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correct", "alternatives"],
+      "properties": {
+        "correct": { "$ref": "#/$defs/nonEmpty" },
+        "alternatives": { "$ref": "#/$defs/alternatives" },
+        "match": { "const": "strict-yo" }
+      }
+    },
+    "fieldsAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields"],
+      "properties": {
+        "fields": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "correct", "alternatives"],
+            "properties": {
+              "label": { "$ref": "#/$defs/nonEmpty" },
+              "correct": { "$ref": "#/$defs/nonEmpty" },
+              "alternatives": { "$ref": "#/$defs/alternatives" },
+              "match": { "const": "strict-yo" }
+            }
+          }
+        }
+      }
+    },
+    "choiceAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correct", "alternatives"],
+      "properties": {
+        "correct": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z]$" }
+        },
+        "alternatives": { "const": [] }
+      }
+    },
+    "oralAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "alternatives"],
+      "properties": {
+        "model": { "$ref": "#/$defs/nonEmpty" },
+        "alternatives": { "$ref": "#/$defs/list" }
+      }
+    },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Z]$" },
+          "label": { "$ref": "#/$defs/nonEmpty" }
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "class", "skill", "topic", "subtopic", "difficulty", "chapter",
+        "track", "scene", "situation", "interaction", "prompt", "materials",
+        "answer", "explanation", "commonErrors", "hints", "rubric", "gameEffect"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[CV]0[1-6]-[0-9]{2}$" },
+        "class": { "const": 7 },
+        "skill": { "type": "string", "pattern": "^(P|D)-[A-Z-]+$|^STRESS$" },
+        "topic": { "enum": ["Причастие", "Деепричастие", "Культура речи"] },
+        "subtopic": { "$ref": "#/$defs/nonEmpty" },
+        "difficulty": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "chapter": { "$ref": "#/$defs/chapter" },
+        "track": { "enum": ["story", "practice"] },
+        "scene": { "enum": ["platform", "traction", "laboratory", "archive", "tunnel", "escape"] },
+        "situation": { "$ref": "#/$defs/nonEmpty" },
+        "interaction": { "enum": ["text", "fields", "choice", "multi", "oral"] },
+        "prompt": { "$ref": "#/$defs/nonEmpty" },
+        "materials": { "$ref": "#/$defs/list" },
+        "options": { "$ref": "#/$defs/options" },
+        "answer": { "type": "object" },
+        "explanation": { "$ref": "#/$defs/nonEmpty" },
+        "commonErrors": { "$ref": "#/$defs/list" },
+        "hints": {
+          "allOf": [
+            { "$ref": "#/$defs/list" },
+            { "minItems": 2, "maxItems": 2 }
+          ]
+        },
+        "rubric": { "$ref": "#/$defs/list" },
+        "gameEffect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event", "description"],
+          "properties": {
+            "event": { "type": "string", "pattern": "^[a-z]+\\.[A-Za-z0-9-]+$" },
+            "description": { "$ref": "#/$defs/nonEmpty" }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": { "interaction": { "const": "text" }, "answer": { "$ref": "#/$defs/textAnswer" } },
+          "not": { "required": ["options"] }
+        },
+        {
+          "properties": { "interaction": { "const": "fields" }, "answer": { "$ref": "#/$defs/fieldsAnswer" } },
+          "not": { "required": ["options"] }
+        },
+        {
+          "required": ["options"],
+          "properties": {
+            "interaction": { "const": "choice" },
+            "answer": {
+              "allOf": [
+                { "$ref": "#/$defs/choiceAnswer" },
+                { "properties": { "correct": { "maxItems": 1 } } }
+              ]
+            }
+          }
+        },
+        {
+          "required": ["options"],
+          "properties": {
+            "interaction": { "const": "multi" },
+            "answer": {
+              "allOf": [
+                { "$ref": "#/$defs/choiceAnswer" },
+                { "properties": { "correct": { "minItems": 2 } } }
+              ]
+            }
+          }
+        },
+        {
+          "properties": { "interaction": { "const": "oral" }, "answer": { "$ref": "#/$defs/oralAnswer" } },
+          "not": { "required": ["options"] }
+        }
+      ]
+    }
+  }
+}
