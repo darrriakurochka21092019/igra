@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1117">
+  <meta name="description" content="Сюжетная 2D-игра для 7 класса. Найди Даню, восстанови команды станции и выйди на поверхность.">
+  <title>Станция Ноль — Протокол ЭХО</title>
+  <link rel="icon" href="./station-mark.png">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Станция Ноль, главная"><span class="brand-mark" aria-hidden="true">0</span><span>СТАНЦИЯ <b>НОЛЬ</b></span></a>
+    <nav aria-label="Игра">
+      <button id="open-controls" class="nav-button" type="button">Управление</button>
+      <button id="open-settings" class="nav-button" type="button">Настройки</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" class="home">
+      <div class="title-screen">
+        <div class="cover" aria-hidden="true"></div>
+        <div class="cover-copy">
+          <p class="eyebrow"><span class="signal"></span> СЮЖЕТНАЯ 2D-ИГРА <span class="eyebrow-separator">/</span> 7 КЛАСС</p>
+          <h1>СТАНЦИЯ<br><em>НОЛЬ</em></h1>
+          <p class="protocol">ПРОТОКОЛ ЭХО</p>
+          <p class="premise">Даня оставил сообщение с закрытой станции метро. Спустись за ним, восстанови питание и найди выход, пока ЭХО повторяет последнюю смену.</p>
+          <div class="title-actions">
+            <button id="continue" class="button primary" type="button" hidden>Продолжить <span aria-hidden="true">→</span></button>
+            <button id="start" class="button primary" type="button">Начать игру <span aria-hidden="true">→</span></button>
+          </div>
+          <p id="saved-label" class="save-label" hidden></p>
+        </div>
+        <div class="cover-footer"><span class="cover-line"></span> СЛУЖЕБНАЯ ЛИНИЯ МЕТРО <span class="cover-index">/ 00</span></div>
+      </div>
+      <ol class="chapter-line" aria-label="Главы">
+        <li><span class="chapter-number">01</span><span><strong>Последний поезд</strong><small>Восстанови питание</small></span></li>
+        <li><span class="chapter-number">02</span><span><strong>Архив смен</strong><small>Используй свой повтор</small></span></li>
+        <li><span class="chapter-number">03</span><span><strong>Живой выход</strong><small>Выведи Даню на поверхность</small></span></li>
+      </ol>
+      <p class="home-meta"><span>Русский язык</span><span>Причастия и деепричастия</span><span>Самостоятельно или с преподавателем</span></p>
+    </section>
+
+    <section id="play" class="play" hidden>
+      <header class="play-heading">
+        <div>
+          <p id="game-chapter" class="eyebrow"></p>
+          <h1 id="game-title"></h1>
+        </div>
+        <div class="top-actions">
+          <button id="open-map" class="button compact secondary" type="button"><span aria-hidden="true">◇</span> Карта <kbd>M</kbd></button>
+          <button id="pause" class="button compact secondary" type="button"><span aria-hidden="true">Ⅱ</span> Пауза <kbd>Esc</kbd></button>
+        </div>
+      </header>
+      <div class="play-grid">
+        <div class="play-main">
+          <div class="game-frame">
+            <div id="canvas-host" role="region" aria-label="Карта станции. Управление стрелками или WASD." tabindex="0"></div>
+            <div class="view-top">
+              <span id="room-label" class="view-chip"></span>
+              <span id="combat-label" class="view-chip muted">СЛУЖЕБНАЯ ЗОНА</span>
+            </div>
+            <div id="echo-hud" class="echo-hud" hidden>
+              <span id="echo-label"></span>
+              <progress id="echo-progress" aria-label="Время записи" max="1"></progress>
+            </div>
+            <button id="interact" class="interaction" type="button" hidden><kbd>E</kbd><span></span></button>
+            <p id="notice" class="notice" role="status" hidden></p>
+          </div>
+          <div class="command-strip" aria-label="Клавиши">
+            <span><kbd>WASD</kbd> Движение</span><span><kbd>E</kbd> Действие</span><span><kbd>ЛКМ</kbd> Импульс</span><span><kbd>Пробел</kbd> Рывок</span><span><kbd>Shift</kbd> Бег</span>
+          </div>
+          <div class="touch-controls" aria-label="Сенсорное управление">
+            <div class="dpad">
+              <button type="button" data-hold="ArrowUp" aria-label="Вверх">↑</button>
+              <button type="button" data-hold="ArrowLeft" aria-label="Влево">←</button>
+              <button type="button" data-hold="ArrowDown" aria-label="Вниз">↓</button>
+              <button type="button" data-hold="ArrowRight" aria-label="Вправо">→</button>
+            </div>
+            <div class="touch-actions">
+              <button type="button" data-tap="KeyF">Импульс</button>
+              <button type="button" data-tap="Space">Рывок</button>
+              <button type="button" data-tap="KeyE">Действие</button>
+            </div>
+          </div>
+        </div>
+        <aside class="sidebar" aria-label="Состояние игрока">
+          <section class="side-block objective">
+            <div class="side-label"><span class="signal"></span> ЗАДАЧА</div>
+            <h2 id="objective-title"></h2>
+            <p id="objective-detail"></p>
+            <div id="target" class="target" hidden><span id="target-arrow" aria-hidden="true">→</span><span id="target-label"></span></div>
+          </section>
+          <section class="side-block">
+            <div class="side-label">СОСТОЯНИЕ МИРЫ</div>
+            <div id="health" class="health" role="img" aria-label="Здоровье: 5 из 5">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="dash-meter"><span>Рывок</span><progress id="dash" max="1" value="1" aria-label="Заряд рывка"></progress></div>
+          </section>
+          <section class="side-block">
+            <div class="side-label">ХОД ПРОХОЖДЕНИЯ</div>
+            <ol id="chapter-progress" class="chapter-progress">
+              <li><span>01</span> Последний поезд</li>
+              <li><span>02</span> Архив смен</li>
+              <li><span>03</span> Живой выход</li>
+            </ol>
+            <button id="open-journal" class="text-button" type="button">Журнал и задания <span aria-hidden="true">→</span></button>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="overlay" aria-labelledby="dialog-title">
+    <div class="dialog-top"><p id="dialog-label" class="eyebrow"></p><button id="close-dialog" class="close-button" type="button" aria-label="Закрыть">×</button></div>
+    <h2 id="dialog-title" tabindex="-1"></h2>
+    <div id="dialog-content"></div>
+  </dialog>
+
+  <noscript>Для игры включите JavaScript в браузере.</noscript>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
