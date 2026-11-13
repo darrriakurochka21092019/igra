@@ -45,7 +45,8 @@ def validate_bank():
         require((file["chapter"], file["title"]) == (number, chapter["title"]), f"Chapter {number} metadata")
         records = file["questions"]
         ids = [question["id"] for question in records]
-        require(ids == [f"C{number:02}-{position:02}" for position in range(1, 19)], f"Chapter {number} IDs")
+        require(len(ids) >= 18 and ids == [f"C{number:02}-{position:02}" for position in range(1, len(ids) + 1)],
+                f"Chapter {number} IDs")
         require(not written.keys() & set(ids), f"Chapter {number} has duplicate question IDs")
         written.update(zip(ids, records))
 

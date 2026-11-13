@@ -370,7 +370,7 @@ function openTerminal(id: string): void {
     else toast('Эта команда уже сохранена.');
     return;
   }
-  const ids = terminalQuestionIds(id, progress.originalTerminals);
+  const ids = terminalQuestionIds(id, progress.terminalVersions);
   const index = ids.findIndex(questionId => !progress?.attempts[questionId]?.passed);
   if (index < 0) { applyTerminal(id); return; }
   const question = questions.get(ids[index])!;
@@ -428,7 +428,7 @@ function voiceLabel(): string {
 }
 
 function score(): Score {
-  const entries = reportQuestions(progress?.lesson ? progress.chapter : undefined, progress?.originalTerminals);
+  const entries = reportQuestions(progress?.lesson ? progress.chapter : undefined, progress?.terminalVersions);
   const attempts = entries.map(({ question }) => progress?.attempts[question.id]).filter(attempt => attempt !== undefined);
   const topics = new Map<string, Score['review'][number]>();
   for (const { question } of entries) {
@@ -454,7 +454,7 @@ function score(): Score {
 function exportScore(): void {
   if (!progress) return;
   const rows: (string | number)[][] = [['Глава', 'Задание', 'Раздел', 'Навык', 'Попытки', 'Ошибки', 'Подсказки', 'Итог']];
-  for (const { chapter, question } of reportQuestions(progress.lesson ? progress.chapter : undefined, progress.originalTerminals)) {
+  for (const { chapter, question } of reportQuestions(progress.lesson ? progress.chapter : undefined, progress.terminalVersions)) {
     const a = progress.attempts[question.id];
     const status = a?.passed
       ? (a.reviewed ? 'После разбора' : a.hints ? 'С подсказкой' : a.count > 1 ? 'Со второй или последующей попытки' : 'С первой попытки')
