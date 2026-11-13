@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "chapters": [
+    {
+      "chapter": 1,
+      "title": "Последний поезд",
+      "scene": "platform",
+      "file": "chapter-01.json",
+      "encounters": [
+        {
+          "name": "Канал дежурного",
+          "event": "duty.channelRestored",
+          "requires": [
+            "C01-01",
+            "C01-02"
+          ]
+        },
+        {
+          "name": "Панель ремонтной клетки",
+          "event": "repair.cagePowered",
+          "requires": [
+            "C01-03",
+            "C01-04"
+          ]
+        },
+        {
+          "name": "Терминал выхода",
+          "event": "platform.exitCleared",
+          "requires": [
+            "C01-05",
+            "C01-06"
+          ]
+        }
+      ],
+      "oralRequired": "V01-01",
+      "oralEvent": "voice.platform"
+    },
+    {
+      "chapter": 2,
+      "title": "Ток по путям",
+      "scene": "traction",
+      "file": "chapter-02.json",
+      "encounters": [
+        {
+          "name": "Сигнал занятости путей",
+          "event": "tracks.occupancyRestored",
+          "requires": [
+            "C02-01",
+            "C02-02"
+          ]
+        },
+        {
+          "name": "Подъёмник",
+          "event": "lift.signalRestored",
+          "requires": [
+            "C02-03",
+            "C02-04"
+          ]
+        },
+        {
+          "name": "Ниша перевода стрелок",
+          "event": "switch.manualMode",
+          "requires": [
+            "C02-05",
+            "C02-06"
+          ]
+        }
+      ],
+      "oralRequired": "V02-01",
+      "oralEvent": "voice.traction"
+    },
+    {
+      "chapter": 3,
+      "title": "Камера возврата",
+      "scene": "laboratory",
+      "file": "chapter-03.json",
+      "encounters": [
+        {
+          "name": "Табло камер",
+          "event": "lab.markingsRestored",
+          "requires": [
+            "C03-01",
+            "C03-02"
+          ]
+        },
+        {
+          "name": "Анализатор записи",
+          "event": "lab.recordingRebuilt",
+          "requires": [
+            "C03-03",
+            "C03-04"
+          ]
+        },
+        {
+          "name": "Шлюз",
+          "event": "lab.airlockArmed",
+          "requires": [
+            "C03-05",
+            "C03-06"
+          ]
+        }
+      ],
+      "oralRequired": "V03-01",
+      "oralEvent": "voice.laboratory"
+    },
+    {
+      "chapter": 4,
+      "title": "Архив смен",
+      "scene": "archive",
+      "file": "chapter-04.json",
+      "encounters": [
+        {
+          "name": "Каталог",
+          "event": "archive.catalogRestored",
+          "requires": [
+            "C04-01",
+            "C04-02"
+          ]
+        },
+        {
+          "name": "Исходная ячейка",
+          "event": "archive.cellLocated",
+          "requires": [
+            "C04-03",
+            "C04-04"
+          ]
+        },
+        {
+          "name": "Фиксатор Смотрителя",
+          "event": "archive.shieldWindow",
+          "requires": [
+            "C04-05",
+            "C04-06"
+          ]
+        }
+      ],
+      "oralRequired": "V04-01",
+      "oralEvent": "voice.archive"
+    },
+    {
+      "chapter": 5,
+      "title": "Тоннель повтора",
+      "scene": "tunnel",
+      "file": "chapter-05.json",
+      "encounters": [
+        {
+          "name": "Разметка действий",
+          "event": "tunnel.actionsRestored",
+          "requires": [
+            "C05-01",
+            "C05-02"
+          ]
+        },
+        {
+          "name": "Привод моста",
+          "event": "bridge.driveRestored",
+          "requires": [
+            "C05-03",
+            "C05-04"
+          ]
+        },
+        {
+          "name": "Пульт передачи питания",
+          "event": "tunnel.powerTransferArmed",
+          "requires": [
+            "C05-05",
+            "C05-06"
+          ]
+        }
+      ],
+      "oralRequired": "V05-01",
+      "oralEvent": "voice.tunnel"
+    },
+    {
+      "chapter": 6,
+      "title": "Живой выход",
+      "scene": "escape",
+      "file": "chapter-06.json",
+      "encounters": [
+        {
+          "name": "Схема ролей",
+          "event": "escape.rolesRestored",
+          "requires": [
+            "C06-01",
+            "C06-02"
+          ]
+        },
+        {
+          "name": "Панель маршрута",
+          "event": "escape.routeArmed",
+          "requires": [
+            "C06-03",
+            "C06-04"
+          ]
+        },
+        {
+          "name": "Ручная заслонка",
+          "event": "escape.shutterEnabled",
+          "requires": [
+            "C06-05",
+            "C06-06"
+          ]
+        }
+      ],
+      "oralRequired": "V06-01",
+      "oralEvent": "voice.escape"
+    }
+  ],
+  "oralFile": "oral.json"
+}
